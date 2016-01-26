@@ -1,0 +1,8 @@
+File Server:
+- multiple can run at the same time
+- storing files relative to location arg passed
+- provide operations for read and write
+- advertise its id and the contents to the directory server 
+
+Directory Server:
+-
