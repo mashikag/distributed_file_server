@@ -80,6 +80,7 @@ def main():
     if len(sys.argv)!=3:
         print 'Invalid number of arguments: 2 arguments required, port number to which bind the server and the size of the thread pool to be created.\nActual number of arguments: ' + str(len(sys.argv)-1)
         sys.exit()
+    print 'run' 
     port = int(sys.argv[1])
     numThread = int(sys.argv[2])
     baseServer = BaseServer(numThread, port)
