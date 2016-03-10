@@ -80,8 +80,8 @@ class Client:
         
 
 def main():
-    if len(sys.argv)!=3:
-        print 'Invalid number of arguments: 2 arguments required, port number to which bind the clint and the port number of the dir server.\nActual number of arguments: ' + str(len(sys.argv)-1)
+    if len(sys.argv)!=5:
+        print 'Invalid number of arguments: 4 arguments required.\n-port number to which bind the clint\n-port number of the dir server\nActual number of arguments: ' + str(len(sys.argv)-1)
         sys.exit()
     port = int(sys.argv[1])
     directoryServerPort = int(sys.argv[2])

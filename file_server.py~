@@ -39,9 +39,8 @@ class ThreadPool:
         # put a new connection on the queue
         self.tasks.put(conn)
 
-class FileServer:
+class DirectoryServer:
     HOST = ''
-    
 
     def __init__(self, numThread, port):
         self.port = port
@@ -83,8 +82,8 @@ def main():
         sys.exit()
     port = int(sys.argv[1])
     numThread = int(sys.argv[2])
-    fileServer = FileServer(numThread, port)
-    fileServer.listen()
+    directoryServer = DirectoryServer(numThread, port)
+    directoryServer.listen()
 
 if __name__ == "__main__":
     main()

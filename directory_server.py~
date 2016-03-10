@@ -4,6 +4,12 @@ import sys
 from threading import Thread
 from Queue import Queue
 
+"""
+The dir server will need to listen for requests to get and write to files(paths)
+it will need to store address + port num of file servers and id of files associate with them and paths associate with the ids
+hold dictionary of key:path, value:id;ip:port  
+"""
+
 STUDENT_ID = '<To be filled in>'
 IP = 'some IP'
 
@@ -39,7 +45,7 @@ class ThreadPool:
         # put a new connection on the queue
         self.tasks.put(conn)
 
-class FileServer:
+class DirectoryServer:
     HOST = ''
     
 
@@ -83,8 +89,8 @@ def main():
         sys.exit()
     port = int(sys.argv[1])
     numThread = int(sys.argv[2])
-    fileServer = FileServer(numThread, port)
-    fileServer.listen()
+    directoryServer = DirectoryServer(numThread, port)
+    directoryServer.listen()
 
 if __name__ == "__main__":
     main()
