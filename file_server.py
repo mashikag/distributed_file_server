@@ -12,15 +12,14 @@ class Worker(Thread):
 
     def __init__(self, tasks, cmdParser):
         Thread.__init__(self)
-        self.tasks = tasks  # each task will be an individual connection
+        self.tasks = tasks  #each task will be an individual connection
         self.cmdParser = cmdParser
         self.daemon = True
         self.start()
 
     def run(self):
-        # run forever
         while True:
-            conn = self.tasks.get()  # take a connection from the queue
+            conn = self.tasks.get()  #take a connection from the queue
             self.cmdParser(conn)
             self.tasks.task_done()
 
