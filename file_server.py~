@@ -1,30 +1,27 @@
 #!/usr/bin/env python
 import socket
 import sys
+import re
 from threading import Thread
 from Queue import Queue
 
 STUDENT_ID = '<To be filled in>'
-IP = 'some IP'
 
 class Worker(Thread):
     """individual thread that handles the clients requests"""
 
     def __init__(self, tasks, cmdParser):
         Thread.__init__(self)
-        self.tasks = tasks  # each task will be an individual connection
+        self.tasks = tasks  #each task will be an individual connection
         self.cmdParser = cmdParser
         self.daemon = True
         self.start()
 
     def run(self):
-        # run forever
         while True:
-            conn = self.tasks.get()  # take a connection from the queue
+            conn = self.tasks.get()  #take a connection from the queue
             self.cmdParser(conn)
             self.tasks.task_done()
-
-
 
 class ThreadPool:
     """pool of worker threads all consuming tasks"""
@@ -38,13 +35,19 @@ class ThreadPool:
     def addTasks(self, conn):
         # put a new connection on the queue
         self.tasks.put(conn)
+        
+        
+        
 
 class FileServer:
     HOST = ''
+    KILL_CMD = r'\s*KILL\s*SERVICE\s*'
+    BEACON_CMD = "file_server= {0}:{1}"
     
 
-    def __init__(self, numThread, port):
+    def __init__(self, numThread, port, directoryServerPort):
         self.port = port
+        self.directoryServerPort = directoryServerPort
         self.numThread = numThread
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -54,7 +57,27 @@ class FileServer:
             print 'Failed to bind the server socket: ' + str(msg[0])
             sys.exit()
         print 'Socket successfully bound.'
+        
         self.threadPool = ThreadPool(numThread, self)
+        
+        self.killCmdRegEx = re.compile(self.KILL_CMD)
+        
+        self.sendBeaconToDirectoryServer()
+    
+    def sendBeaconToDirectoryServer(self) :
+        print 'Sending beacon to the directory server - advertising its presence.'
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect(('',self.directoryServerPort))
+        ipAddress = sock.getsockname()
+        msg = self.BEACON_CMD.format(ipAddress[0], self.port)
+        response = self.generateResponse(msg)
+        sock.sendall(response)
+        ack = sock.recv(2048)
+        if "OK" in ack:
+            print "Directory server is now successfully aware of the file server"
+        else:
+            print "Uknown response from the directory server: " + ack
+        sock.close()
         
     def listen(self):
         print 'Server preparing to listen.'
@@ -63,27 +86,37 @@ class FileServer:
         print 'Server listening on port: ' + str(self.port)
         while True:
             connection, address = self.sock.accept()
-            print 'Incoming connection established with ' + addr[0] + ':' + str(addr[1])
+            print 'Incoming connection established with ' + address[0] + ':' + str(address[1])
             self.threadPool.addTasks(connection)
 
     def cmdParser(self, conn):
         while conn:
             data = conn.recv(2048)
-            if data == "KILL SERVICE\n":
+            if killCmdRegEx.match(data):
                 print 'Shutting down...'
                 conn.sendall("Shutting down the BaseServer...")
                 sys.exit()
-            elif data.startswith("HELO ") and data.endswith("\n"):
-                conn.sendall('{}\nIP:{}\nStduentID:{}\n'.format(data, IP, self.port, STUDENT_ID))
+            else:
+                msg = 'Unrecognized command received.'
+                print msg
+                response = self.generateResponse(msg)
+                conn.sendall(response)
         
+    def generateResponse(self, msg):
+        return msg + "\n\n"
 
 def main():
-    if len(sys.argv)!=3:
-        print 'Invalid number of arguments: 2 arguments required, port number to which bind the server and the size of the thread pool to be created.\nActual number of arguments: ' + str(len(sys.argv)-1)
+    if len(sys.argv)!=4:
+        print 'Invalid number of arguments: 2 arguments required' + \
+            '\nport number to which bind the server and the size of the thread pool to be created.'+\
+            '\nsize of the thread pool of the server'+\
+            '\nport number of the directory server'+\
+            '\nActual number of arguments: ' + str(len(sys.argv)-1)
         sys.exit()
     port = int(sys.argv[1])
     numThread = int(sys.argv[2])
-    fileServer = FileServer(numThread, port)
+    directoryServerPort = int(sys.argv[3])
+    fileServer = FileServer(numThread, port, directoryServerPort)
     fileServer.listen()
 
 if __name__ == "__main__":
