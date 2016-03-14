@@ -5,8 +5,6 @@ import re
 from threading import Thread
 from Queue import Queue
 
-STUDENT_ID = '<To be filled in>'
-
 class Worker(Thread):
     """individual thread that handles the clients requests"""
 
@@ -41,8 +39,12 @@ class ThreadPool:
 
 class FileServer:
     HOST = ''
-    KILL_CMD = r'\s*KILL\s*SERVICE\s*'
+    KILL_CMD = r'\s*KILL\s+SERVICE\s*'
     BEACON_CMD = "file_server= {0}:{1}"
+    WRITE_CMD = r'\s*write\s+-id\s+\w+\s+-data\s+[\w\s]+\s*'
+    GET_CMD = r'\s*get\s+-id\s+\w+\s*'
+    FILE_DATA_RESPONSE = "-data:\"{0}\""
+    ACK = "OK"
 
     def __init__(self, numThread, port, directoryServerPort):
         self.port = port
@@ -60,6 +62,8 @@ class FileServer:
         self.threadPool = ThreadPool(numThread, self)
         
         self.killCmdRegEx = re.compile(self.KILL_CMD)
+        self.writeCmdRegEx = re.compile(self.WRITE_CMD)
+        self.getCmdRegEx = re.compile(self.GET_CMD)
         
         self.sendBeaconToDirectoryServer()
     
@@ -72,7 +76,7 @@ class FileServer:
         response = self.generateResponse(msg)
         sock.sendall(response)
         ack = sock.recv(2048)
-        if "OK" in ack:
+        if self.ACK in ack:
             print "Directory server is now successfully aware of the file server"
         else:
             print "Uknown response from the directory server: " + ack
@@ -89,17 +93,70 @@ class FileServer:
             self.threadPool.addTasks(connection)
 
     def cmdParser(self, conn):
-        while conn:
-            data = conn.recv(2048)
-            if killCmdRegEx.match(data):
-                print 'Shutting down...'
-                conn.sendall("Shutting down the BaseServer...")
-                sys.exit()
-            else:
-                msg = 'Unrecognized command received.'
+        data = conn.recv(2048)
+        if self.killCmdRegEx.match(data):
+            print 'Shutting down...'
+            conn.sendall("Shutting down the BaseServer...")
+            sys.exit()
+        elif self.writeCmdRegEx.match(data):
+            print 'Write cmd request received.'
+            fileId = self.getFileIdFromRequest(data)
+            dataToWrite = self.getDataToWrite(data)
+            self.writeFile(fileId, dataToWrite)
+            print 'Sending ack.'
+            response = self.generateResponse(self.ACK)
+            conn.sendall(response)
+        elif self.getCmdRegEx.match(data):
+            print 'Get cmd request received.'
+            fileId = self.getFileIdFromRequest(data)
+            fileData = self.getFileData(fileId)
+            if None:
+                msg = "Error: " + fileId + " - File not found."
                 print msg
                 response = self.generateResponse(msg)
                 conn.sendall(response)
+            else:
+                print "Sending back file "+fileId+" contents."
+                msg = self.FILE_DATA_RESPONSE.format(fileData)
+                response = self.generateResponse(msg)
+                conn.sendall(response)
+        else:
+            msg = 'Error - Unrecognized command received. ' + data
+            print msg
+            response = self.generateResponse(msg)
+            conn.sendall(response)
+                
+    def writeFile(self, fileId, data):
+        fileId = fileId.strip()
+        print 'Opening the file: ' + fileId
+        f = open(fileId, 'w')
+        print 'Writing the file: ' + fileId
+        f.write(data)
+        f.close()
+    
+    def getFileData(self, fileId):
+        f = open(fileId, 'r')
+        data = f.read()
+        f.close()
+        return data
+    
+    def getDataToWrite(self, requestData):
+        dataFlag = '-data'
+        dataFlagStartIndex = requestData.find(dataFlag)
+        data = requestData[(dataFlagStartIndex+len(dataFlag)):]
+        return data
+        
+    def getFileIdFromRequest(self, requestData):
+        idFlag = '-id'
+        dataFlag = '-data'
+        idFlagStartIndex = requestData.find(idFlag)
+        fileId = requestData[(idFlagStartIndex+len(idFlag)):].strip()
+        
+        dataFlagStartIndex = fileId.find(dataFlag)
+        if dataFlagStartIndex != -1:
+            fileId = fileId[:dataFlagStartIndex]
+            
+        return fileId
         
     def generateResponse(self, msg):
         return msg + "\n\n"

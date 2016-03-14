@@ -44,7 +44,9 @@ class Client:
             dataStr = cmd[pathMatch.end() : ].split()[1] #-data part of the cmd starts after path part finishes
             dataStr = dataStr[1:-1] #get rid of the quotations
             
-            self.getFileServerData(pathStr)
+            fileId, fileServerIpAddress, port = self.getFileServerData(pathStr)
+            self.writeToFileServer(fileServerIpAddress, port, fileId, dataStr)
+            """ now make a call to the file server to execute the write """
         elif self.getCmdRegEx.match(cmd) != None:
             print "expecting get exec"
             pathRegExRaw = r'\s-path\s+[a-zA-Z\\/0-9]+\s*'
@@ -54,6 +56,14 @@ class Client:
                 print 'get path argument found assuming call to the directory server'
                 pathStr = cmd[pathMatch.start() : pathMatch.end()].split()[1]
                 print "path: " + pathStr
+                
+                fileId, fileServerIpAddress, port = self.getFileServerData(pathStr)
+                """ now make a call to the file server to retrieve the data from the file"""
+                fileData = self.getFileDataFromFileServer(fileId, fileServerIpAddress, port)
+                if fileData is not None:
+                    print pathStr + "\n" + fileData
+                else:
+                    print "Unsuccessfull get request for " + pathStr
             else:
                 print 'get path argument not found assuming call to the file server'
                 idRegExRaw = r'\s-id\s+[a-zA-Z\\/0-9]+\s*'
@@ -79,7 +89,34 @@ class Client:
                 idStr = cmd[idMatch.start() : idMatch.end()].split()[1]
                 print "id: " + idStr
         else:
-            print "'"+cmd+"'unrecognized command"
+            print "'"+cmd+"' unrecognized command"
+            
+    def getFileDataFromFileServer(self, fileId, ipAddress, port):
+        reqCmd = "get -id " + fileId
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((ipAddress,int(port)))
+        print "Sending file get cmd to: " + ipAddress + ":" + port
+        sock.sendall(reqCmd)
+        dataRecv = ""
+        while "\n\n" not in dataRecv:
+            dataRecv += sock.recv(2048)
+        sock.close()
+        return dataRecv
+        
+    def writeToFileServer(self, ipAddress, port, fileId, data):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((ipAddress,int(port)))
+        msg = "write -id "+ fileId +" -data " + data
+        print "Sending data to the fileserver " + ipAddress + ":" + port
+        sock.sendall(msg)
+        print "Wait for an ack."
+        response = sock.recv(2048)
+        if "OK" in response:
+            print "Received an ack."
+            return True
+        else:
+            print "Unrecognized ack received."
+            return False
         
     def getFileServerData(self, path):
         fileId = ''
@@ -105,7 +142,7 @@ class Client:
             print dirServerResponse
             fileId, address = dirServerResponse.split(";",1)
             ipAddress, port = address.split(":",1)
-            print "Files server data extracted: fileId="+fileId+"; address="+ipAddress+":"+port
+            print "Files server data extracted: fileId=" + fileId + "; address=" + ipAddress + ":" + port
         return (fileId, ipAddress, port)
         
         
